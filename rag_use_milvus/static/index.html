@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI陪伴精灵服务 - 演示页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 800px;
+            padding: 30px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .chat-container {
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: #f9f9f9;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        
+        .user-message {
+            background: #007bff;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        
+        .ai-message {
+            background: #e9ecef;
+            color: #333;
+            margin-right: auto;
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .input-container input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        .input-container input:focus {
+            border-color: #007bff;
+        }
+        
+        .input-container button {
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        
+        .input-container button:hover {
+            background: #0056b3;
+        }
+        
+        .input-container button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .config-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .config-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .config-item label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .config-item input, .config-item select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .api-info {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        
+        .api-info h3 {
+            color: #0066cc;
+            margin-bottom: 10px;
+        }
+        
+        .api-info p {
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        @media (max-width: 600px) {
+            .config-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                width: 95%;
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧚‍♀️ AI陪伴精灵</h1>
+            <p>基于FastAPI+LangChain+LangGraph+Milvus的智能陪伴服务</p>
+        </div>
+        
+        <div id="status" class="status" style="display: none;"></div>
+        
+        <div class="config-section">
+            <div class="config-item">
+                <label for="userId">用户ID:</label>
+                <input type="text" id="userId" value="user_001" placeholder="输入用户ID">
+            </div>
+            <div class="config-item">
+                <label for="characterId">角色ID:</label>
+                <select id="characterId">
+                    <option value="default">小灵 (默认)</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="chat-container" id="chatContainer">
+            <div class="message ai-message">
+                <strong>小灵:</strong> 你好！我是你的AI陪伴精灵小灵，很高兴认识你！有什么想聊的吗？ 😊
+            </div>
+        </div>
+        
+        <div class="input-container">
+            <input type="text" id="messageInput" placeholder="输入你想说的话..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()" id="sendButton">发送</button>
+        </div>
+        
+        <div class="api-info">
+            <h3>📚 API文档</h3>
+            <p><strong>Swagger文档:</strong> <a href="/docs" target="_blank">/docs</a></p>
+            <p><strong>ReDoc文档:</strong> <a href="/redoc" target="_blank">/redoc</a></p>
+            <p><strong>健康检查:</strong> <a href="/health" target="_blank">/health</a></p>
+            <p><strong>系统信息:</strong> <a href="/system/info" target="_blank">/system/info</a></p>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = null;
+        
+        // 页面加载时初始化
+        window.onload = function() {
+            loadCharacters();
+            checkHealth();
+        };
+        
+        // 检查服务健康状态
+        async function checkHealth() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                showStatus('服务运行正常 ✅', 'success');
+            } catch (error) {
+                showStatus('服务连接失败 ❌', 'error');
+            }
+        }
+        
+        // 加载可用角色
+        async function loadCharacters() {
+            try {
+                const response = await fetch('/characters');
+                const data = await response.json();
+                const select = document.getElementById('characterId');
+                
+                // 清空现有选项
+                select.innerHTML = '';
+                
+                // 添加角色选项
+                for (const [id, name] of Object.entries(data.characters)) {
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = name;
+                    if (id === 'default') option.selected = true;
+                    select.appendChild(option);
+                }
+            } catch (error) {
+                console.error('Failed to load characters:', error);
+            }
+        }
+        
+        // 显示状态消息
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 3000);
+        }
+        
+        // 添加消息到聊天容器
+        function addMessage(content, isUser = false, characterName = 'AI') {
+            const chatContainer = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+            
+            if (isUser) {
+                messageDiv.innerHTML = `<strong>你:</strong> ${content}`;
+            } else {
+                messageDiv.innerHTML = `<strong>${characterName}:</strong> ${content}`;
+            }
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // 发送消息
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const sendButton = document.getElementById('sendButton');
+            const userId = document.getElementById('userId').value;
+            const characterId = document.getElementById('characterId').value;
+            const message = messageInput.value.trim();
+            
+            if (!message) return;
+            if (!userId) {
+                showStatus('请输入用户ID', 'error');
+                return;
+            }
+            
+            // 禁用输入
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+            sendButton.textContent = '发送中...';
+            
+            // 添加用户消息到界面
+            addMessage(message, true);
+            messageInput.value = '';
+            
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        character_id: characterId,
+                        message: message,
+                        session_id: sessionId
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // 更新会话ID
+                if (!sessionId) {
+                    sessionId = data.session_id;
+                }
+                
+                // 添加AI回复到界面
+                addMessage(data.message, false, data.character_name);
+                
+            } catch (error) {
+                console.error('Chat error:', error);
+                addMessage('抱歉，发生了错误，请稍后再试。', false, '系统');
+                showStatus('发送消息失败', 'error');
+            } finally {
+                // 恢复输入
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                sendButton.textContent = '发送';
+                messageInput.focus();
+            }
+        }
+        
+        // 处理回车键
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+    </script>
+</body>
+</html>
