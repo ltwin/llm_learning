@@ -822,6 +822,7 @@ dependencies = [
     { name = "langchain", extra = ["openai"] },
     { name = "langchain-community" },
     { name = "langgraph" },
+    { name = "memobase" },
     { name = "pymilvus" },
     { name = "requests" },
 ]
@@ -835,6 +836,7 @@ requires-dist = [
     { name = "langchain", extras = ["openai"], specifier = ">=0.3.26" },
     { name = "langchain-community", specifier = ">=0.3.27" },
     { name = "langgraph", specifier = ">=0.5.4" },
+    { name = "memobase", specifier = ">=0.0.23" },
     { name = "pymilvus", specifier = ">=2.5.14" },
     { name = "requests", specifier = ">=2.32.4" },
 ]
@@ -887,6 +889,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ab/5e/5e53d26b42ab75491cda89b871dab9e97c840bf12c63ec58a1919710cd06/marshmallow-3.26.1.tar.gz", hash = "sha256:e6d8affb6cb61d39d26402096dc0aee12d5a26d490a121f118d2e81dc0719dc6", size = 221825, upload-time = "2025-02-03T15:32:25.093Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/34/75/51952c7b2d3873b44a0028b1bd26a25078c18f92f256608e8d1dc61b39fd/marshmallow-3.26.1-py3-none-any.whl", hash = "sha256:3350409f20a70a7e4e11a27661187b77cdcaeb20abca41c1454fe33636bea09c", size = 50878, upload-time = "2025-02-03T15:32:22.295Z" },
+]
+
+[[package]]
+name = "memobase"
+version = "0.0.23"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "openai" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6a/47/ce69f0e088277bf76e5f83777a70f5d8f98d64b9fc3273d4c498b0b8c11e/memobase-0.0.23.tar.gz", hash = "sha256:7fc8610877a7efbcf21f1b12bcde95ea0697a7f2bc8c6dacff5428abf755e936", size = 23105, upload-time = "2025-07-12T13:52:23.124Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/82/42/c2427d8979d0e576f2a33fe1dfc6a719c277bd3b8f5c6e3af0b296202128/memobase-0.0.23-py3-none-any.whl", hash = "sha256:2da0d33d0a7db6703698b7925b0cbed239b3b2b768afa692b0c291a69e8c2ac2", size = 21781, upload-time = "2025-07-12T13:52:19.624Z" },
 ]
 
 [[package]]

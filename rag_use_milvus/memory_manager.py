@@ -264,7 +264,7 @@ class MemoryManager:
         session_id: str, 
         user_id: str, 
         character_id: str,
-        location: str = "未知地点"
+        location: str = "网络空间"
     ) -> Optional[Memory]:
         """生成对话总结记忆"""
         try:
