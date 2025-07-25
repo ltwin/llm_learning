@@ -106,33 +106,35 @@ class ConversationGraph:
     async def _retrieve_memories(self, state: ConversationState) -> ConversationState:
         """检索相关记忆"""
         try:
-            logger.info(f"Retrieving memories for query: {state.user_input[:50]}...")
+            logger.info(f"Retrieving memories for user {state.user_id}, character {state.character_id}")
             
-            # 检索相关记忆
+            # 使用Memobase检索相关记忆
             memories = await self.memory_manager.retrieve_relevant_memories(
                 query=state.user_input,
                 user_id=state.user_id,
                 character_id=state.character_id,
-                limit=5
+                limit=10
             )
             
-            # 转换为字典格式
-            state.relevant_memories = [
-                {
-                    "content": memory.content,
-                    "memory_type": memory.memory_type.value,
-                    "importance_score": memory.importance_score,
-                    "created_at": memory.created_at.isoformat()
+            # 转换Memory对象为兼容格式
+            formatted_memories = []
+            for memory in memories:
+                formatted_memory = {
+                    'content': memory.content,
+                    'importance_score': memory.importance_score,
+                    'timestamp': memory.created_at.isoformat() if memory.created_at else '',
+                    'metadata': memory.metadata
                 }
-                for memory in memories
-            ]
+                formatted_memories.append(formatted_memory)
             
-            logger.info(f"Retrieved {len(state.relevant_memories)} relevant memories")
+            state.relevant_memories = formatted_memories
+            logger.info(f"Retrieved {len(formatted_memories)} relevant memories")
             return state
             
         except Exception as e:
             logger.error(f"Failed to retrieve memories: {e}")
-            state.metadata["memory_error"] = str(e)
+            state.relevant_memories = []
+            state.metadata["memory_retrieval_error"] = str(e)
             return state
     
     async def _prepare_context(self, state: ConversationState) -> ConversationState:
@@ -194,29 +196,22 @@ class ConversationGraph:
         try:
             logger.info("Processing conversation memories")
             
-            # 添加用户消息到对话
-            from models import Message, MessageRole
-            user_msg = Message(
-                role=MessageRole.USER,
-                content=state.user_input,
-                metadata={"user_id": state.user_id, "character_id": state.character_id}
-            )
-            await self.memory_manager.add_message_to_conversation(
+            # 添加用户消息到Memobase
+            await self.memory_manager.add_message(
                 user_id=state.user_id,
+                content=state.user_input,
+                role="user",
                 session_id=state.session_id,
-                message=user_msg
+                metadata={"character_id": state.character_id}
             )
             
-            # 添加AI回复到对话
-            assistant_msg = Message(
-                role=MessageRole.ASSISTANT,
-                content=state.ai_response,
-                metadata={"user_id": state.user_id, "character_id": state.character_id}
-            )
-            await self.memory_manager.add_message_to_conversation(
+            # 添加AI回复到Memobase
+            await self.memory_manager.add_message(
                 user_id=state.user_id,
+                content=state.ai_response,
+                role="assistant",
                 session_id=state.session_id,
-                message=assistant_msg
+                metadata={"character_id": state.character_id}
             )
             
             state.metadata["messages_saved"] = 2
@@ -255,7 +250,8 @@ class ConversationGraph:
         """检查并生成对话总结"""
         try:
             # 获取当前对话的消息数量
-            conversation_history = await self.memory_manager.get_conversation_history(state.session_id)
+            conversation_context = await self.memory_manager.get_conversation_context(state.session_id)
+            conversation_history = conversation_context.get('conversation_history', [])
             message_count = len(conversation_history)
             
             # 设置自动总结的触发条件
@@ -265,12 +261,11 @@ class ConversationGraph:
             if message_count >= AUTO_SUMMARY_THRESHOLD and message_count % AUTO_SUMMARY_THRESHOLD == 0:
                 logger.info(f"Auto-generating summary for session {state.session_id} at {message_count} messages")
                 
-                summary_memory = await self.memory_manager.generate_conversation_summary(
+                summary = await self.memory_manager.generate_conversation_summary(
                     session_id=state.session_id,
-                    user_id=state.user_id,
-                    character_id=state.character_id,
-                    location="对话中"  # 默认地点
+                    user_id=state.user_id
                 )
+                summary_memory = summary if summary else None
                 
                 if summary_memory:
                     state.metadata["auto_summary_generated"] = True

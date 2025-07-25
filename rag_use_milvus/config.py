@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # 对话历史配置
     max_conversation_history: int = 50  # 内存中保持的最大对话历史数量
     
+    # Memobase配置
+    memobase_project_url: str = "http://localhost:8019"
+    memobase_api_key: str = "secret"
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

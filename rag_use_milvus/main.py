@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from typing import Dict, List, Any
+from datetime import datetime
 import os
 
 from config import settings
@@ -14,16 +15,16 @@ from models import (
     MemorySearchRequest, Memory, CharacterBackground
 )
 from vector_store import vector_store
-from hybrid_memory_manager import HybridMemoryManager
+from memobase_memory_manager import MemobaseMemoryManager, MemobaseConfig
 from database import conversation_db
 
-# 初始化混合记忆管理器
-memory_manager = HybridMemoryManager(vector_store, conversation_db)
+# 初始化Memobase记忆管理器
+memory_manager = None  # 将在lifespan中初始化
 from character_manager import character_manager
 from conversation_graph import ConversationGraph
 
 # 初始化对话图
-conversation_graph = ConversationGraph(memory_manager)
+conversation_graph = None  # 将在lifespan中初始化
 
 # 配置日志
 logging.basicConfig(
@@ -36,18 +37,34 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
+    global memory_manager, conversation_graph
+    
     # 启动时初始化
     logger.info("Starting AI Companion Spirit Service...")
     try:
         await vector_store.initialize()
         logger.info("Vector store initialized successfully")
         
-        await memory_manager.initialize()
-        logger.info("Hybrid memory manager initialized successfully")
+        await conversation_db.initialize()
+        logger.info("Database initialized successfully")
         
-        # 更新conversation_graph的memory_manager引用
-        conversation_graph.memory_manager = memory_manager
-        logger.info("Conversation graph updated with hybrid memory manager")
+        # 初始化Memobase记忆管理器
+        memobase_config = MemobaseConfig(
+            project_url=settings.memobase_project_url,
+            api_key=settings.memobase_api_key,
+            batch_size=2,  # 降低批处理大小，确保及时刷新
+            flush_interval=300,
+            context_limit=20
+        )
+        
+        memory_manager = MemobaseMemoryManager(memobase_config)
+        await memory_manager.initialize()
+        logger.info("Memobase memory manager initialized successfully")
+        
+        # 初始化对话图
+        conversation_graph = ConversationGraph(memory_manager)
+        logger.info("Conversation graph updated with Memobase memory manager")
+        
     except Exception as e:
         logger.error(f"Failed to initialize services: {e}")
         raise
@@ -57,6 +74,10 @@ async def lifespan(app: FastAPI):
     # 关闭时清理
     logger.info("Shutting down AI Companion Spirit Service...")
     try:
+        if memory_manager:
+            await memory_manager.shutdown()
+            logger.info("Memobase memory manager shutdown successfully")
+            
         await vector_store.close()
         logger.info("Vector store closed successfully")
     except Exception as e:
@@ -120,8 +141,9 @@ async def health_check():
         stats = await vector_store.get_memory_stats("health_check", "default")
         return {
             "status": "healthy",
-            "timestamp": memory_manager.conversations,
+            "timestamp": "connected",
             "vector_store": "connected",
+            "memobase_memory_manager": "connected",
             "characters_loaded": len(character_manager.characters)
         }
     except Exception as e:
@@ -167,18 +189,13 @@ async def get_conversation_summary(session_id: str):
 @app.get("/conversations/{session_id}/context")
 async def get_conversation_context(
     session_id: str, 
-    user_id: str, 
+    user_id: str = "", 
     current_message: str = "",
-    character_id: str = None
+    character_id: str = ""
 ):
     """获取对话上下文"""
     try:
-        context = await memory_manager.get_conversation_context(
-            user_id=user_id,
-            session_id=session_id,
-            current_message=current_message,
-            character_id=character_id
-        )
+        context = await memory_manager.get_conversation_context(session_id)
         return {"context": context}
     except Exception as e:
         logger.error(f"Failed to get conversation context: {e}")
@@ -301,7 +318,7 @@ async def end_conversation_with_summary(
 ):
     """结束对话并生成总结"""
     try:
-        summary = await memory_manager.end_conversation_with_summary(
+        summary = await memory_manager.generate_conversation_summary(
             session_id=session_id,
             user_id=user_id,
             character_id=character_id,
@@ -333,21 +350,19 @@ async def generate_conversation_summary(
 ):
     """为指定对话生成总结（不结束对话）"""
     try:
-        summary_memory = await memory_manager.generate_conversation_summary(
+        summary = await memory_manager.generate_conversation_summary(
             session_id=session_id,
             user_id=user_id,
             character_id=character_id,
             location=location
         )
         
-        if summary_memory:
+        if summary:
             return {
                 "message": "对话总结已生成",
                 "session_id": session_id,
-                "summary": summary_memory.content,
-                "memory_id": summary_memory.id,
-                "importance_score": summary_memory.importance_score,
-                "created_at": summary_memory.created_at.isoformat()
+                "summary": summary,
+                "created_at": datetime.now().isoformat()
             }
         else:
             raise HTTPException(status_code=400, detail="无法生成对话总结，可能是对话内容不足")
@@ -416,7 +431,7 @@ async def delete_memory(memory_id: str):
 async def cleanup_old_data(background_tasks: BackgroundTasks, days: int = 30):
     """清理旧数据"""
     try:
-        background_tasks.add_task(memory_manager.clear_old_conversations, days)
+        background_tasks.add_task(memory_manager.cleanup_old_sessions, days)
         return {"message": f"开始清理{days}天前的旧数据"}
     except Exception as e:
         logger.error(f"Failed to start cleanup: {e}")
@@ -430,7 +445,7 @@ async def get_system_info():
         return {
             "service_name": "AI陪伴精灵服务",
             "version": "1.0.0",
-            "active_conversations": len(memory_manager.conversations),
+            "memory_manager": "Memobase",
             "available_characters": len(character_manager.characters),
             "settings": {
                 "max_conversation_history": settings.max_conversation_history,

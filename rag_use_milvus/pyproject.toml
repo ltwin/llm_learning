@@ -22,4 +22,5 @@ dependencies = [
     "requests>=2.31.0",
     "openai>=1.0.0",
     "aiosqlite>=0.19.0",
+    "memobase>=0.0.23",
 ]
